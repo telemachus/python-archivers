@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+
+'''photo-dater - use creation dates to arrange photos into YYYY/MM subfolders
+
+Usage:
+    photo-dater [-hvqd] [PHOTO_DIR]
+
+Options:
+    --quiet, -q  Limit log output to warnings or worse
+    --help, -h  Show this menu
+    --dry-run, -d  Describe changes only: no files will be moved
+
+'''
+
+from pathlib import Path
+from sys import stdout
+import logging
+from docopt import docopt
+import exifread
+
+
+def setup_logger(level):
+    '''
+    Create a log object to pass around the program.
+
+    Arguments: level for logging
+
+    1. Create logging instance and set its name, level, handler, and format.
+    2. Return logging instance.
+    '''
+    logger = logging.getLogger(Path(__file__).name)
+    logger.setLevel(level)
+    handler = logging.StreamHandler(stream=stdout)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s '
+                                  '- %(message)s',
+                                  datefmt='%Y-%m-%d %I:%M:%S %p')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
+
+
+def make_paths(paths_needed, dry_run, logger):
+    '''
+    Create the paths needed for the mail backups.
+
+    Arguments:
+    paths_needed -- a set containing names of directories to create
+    dry_run -- True or False, should we *actually* create new paths?
+    logger -- logging object for documenting actions in this function
+
+    1. Iterate over paths_needed
+    3. Use try…except to build the directory paths.
+    4. Return nothing: side effects are the point.
+    '''
+    for path in paths_needed:
+        if dry_run:
+            logger.info(f'would create {path}')
+        else:
+            try:
+                Path.mkdir(path, exist_ok=True, parents=True)
+                logger.info(f"created {path}")
+            except FileExistsError as fe_error:
+                # TODO: If this error is triggered despite exist_ok=True, then
+                # there is a regular file where I want there to be a directory.
+                # Should I exit at this point? The corresponding move will fail
+                # later if I don't.
+                logger.warning(fe_error)
+            except PermissionError as perm_error:
+                logger.exception(perm_error)
+                raise perm_error
+
+
+def move_photos(photos_and_dates, dry_run, logger):
+    '''
+    Arrange all photos into YYYY/MM directories or unknown_date.
+
+    Arguments:
+    photos_and_dates -- a list of (old, new) tuples.
+        old is the current location of the file.
+        new is where we want to move the file.
+    dry_run -- True or False, should we *actually* move the photos?
+    logger -- logging object for documenting actions in this function
+
+    1. Move old to new (or show the renames if dry_run is True).
+    2. Log successful moves and failures.
+    3. Return nothing: side effects are the point.
+    '''
+    for old_path, new_path in photos_and_dates:
+        if old_path == new_path:
+            logger.warning(f'wtf? old_path and new_path are the same!')
+            continue
+        if dry_run:
+            logger.info(f"{old_path} would be moved to {new_path}")
+        else:
+            try:
+                old_path.rename(new_path)
+                logger.info(f"{old_path} was moved to {new_path}")
+            except PermissionError as perm_error:
+                logger.exception(perm_error)
+                raise perm_error
+
+
+def is_photo(item):
+    suffix = item.suffix
+    return (item.is_file()) and (suffix == '.jpg' or suffix == '.jpeg')
+
+
+def scan_photos(path, logger):
+    '''
+    Scan source for photos to put in place.
+
+    Arguments:
+    source -- a directory filled with email
+    logger -- logging object for documenting actions in this function
+
+
+    n. Return paths_needed (a list of YYYY/MM paths to create) and
+    rename_args (a list of tuples with old and new names for photos).
+    '''
+    photos = [(path / f) for f in path.glob('**/*') if is_photo((path / f))]
+    paths_needed = set()
+    rename_args = []
+    no_date = 'unknown-date'
+
+    for old_path in photos:
+        tags = {}
+        try:
+            with open(old_path, 'rb') as photo:
+                tags = exifread.process_file(photo, details=False,
+                                             stop_tag='DateTimeOriginal')
+                t_name = 'EXIF DateTimeOriginal'
+                date = f'{tags.get(t_name, no_date)}'
+                # date looks like '2016:09:25 15:53:25' or 'unknown-date'
+                date_path = '/'.join(date.split(':')[:2])
+                new_path = path / date_path / old_path.name
+                if old_path == new_path:
+                    logger.info(f'{new_path} is already where it needs to be')
+                else:
+                    paths_needed.add(path / date_path)
+                    rename_args.append((old_path, new_path))
+        except (OSError, ValueError):
+            new_path = path / date_path / old_path.name
+            if photo == new_path:
+                logger.info(f'{new_path} is already where it needs to be')
+            else:
+                paths_needed.add(path / no_date)
+                rename_args.append((old_path, new_path))
+
+    return paths_needed, rename_args
+
+
+def process_args(user_args):
+    '''Process arguments from docopt'''
+    if user_args['--quiet']:
+        logger = setup_logger('WARNING')
+    else:
+        logger = setup_logger('INFO')
+
+    if user_args['PHOTO_DIR'] is None:
+        photo_dir = Path.cwd()
+    else:
+        photo_dir = Path(user_args['PHOTO_DIR']).resolve()
+
+    if user_args['--dry-run']:
+        dry_run = True
+    else:
+        dry_run = False
+
+    return photo_dir, dry_run, logger
+
+
+def main():
+    photo_dir, dry_run, logger = process_args(docopt(__doc__))
+    paths_needed, photo_paths = scan_photos(photo_dir, logger)
+    make_paths(paths_needed, dry_run, logger)
+    move_photos(photo_paths, dry_run, logger)
+
+
+if __name__ == '__main__':
+    main()
