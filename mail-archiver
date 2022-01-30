@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-'''mail-archiver - put mail older than the first of the month in dated archive
+"""mail-archiver - put mail older than the first of the month in dated archive
 
 Usage:
     mail-archiver [-hqd] [DATE]
@@ -10,7 +10,7 @@ Options:
     --quiet, -q  Limit log output to warnings or worse
     --dry-run, -d  Describe changes only: no files will be moved
 
-'''
+"""
 
 from datetime import datetime, timezone
 from email import message_from_file
@@ -24,28 +24,29 @@ import re
 
 
 def setup_logger(level):
-    '''
+    """
     Create a log object to pass around the program.
 
     Arguments: level for logging
 
     1. Create logging instance and set its name, level, handler, and format.
     2. Return logging instance.
-    '''
-    logger = logging.getLogger('mail-archiver')
+    """
+    logger = logging.getLogger("mail-archiver")
     logger.setLevel(level)
     handler = logging.StreamHandler(stream=stdout)
     handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s '
-                                  '- %(message)s',
-                                  datefmt='%Y-%m-%d %I:%M:%S %p')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s " "- %(message)s",
+        datefmt="%Y-%m-%d %I:%M:%S %p",
+    )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
 
 
 def make_paths(paths_needed, archive, dry_run, logger):
-    '''
+    """
     Create the paths needed for the mail backups.
 
     Arguments:
@@ -58,16 +59,16 @@ def make_paths(paths_needed, archive, dry_run, logger):
     2. Iterate over the subdirectories we need, namely 'cur', 'new', 'tmp'.
     3. Use try …except to build the directory paths.
     4. Return nothing: side effects are the point.
-    '''
+    """
     for year_month in paths_needed.keys():
-        for sub_folder in ('cur', 'new', 'tmp'):
+        for sub_folder in ("cur", "new", "tmp"):
             maildir_path = archive / year_month / sub_folder
             if dry_run:
-                logger.info(f'would create {maildir_path}')
+                logger.info(f"would create {maildir_path}")
             else:
                 try:
                     Path.mkdir(maildir_path, exist_ok=True, parents=True)
-                    logger.info(f'created {maildir_path}')
+                    logger.info(f"created {maildir_path}")
                 except FileExistsError as fe_error:
                     # TODO: If this error is triggered despite exist_ok=True,
                     # then there is a regular file where I want there to be
@@ -80,11 +81,11 @@ def make_paths(paths_needed, archive, dry_run, logger):
 
 
 def clean_pathname(original_pathname):
-    return re.sub(r',U.*$', '', original_pathname)
+    return re.sub(r",U.*$", "", original_pathname)
 
 
 def move_mails(mails_and_dates, archive, dry_run, logger):
-    '''
+    """
     Back up email older than a certain date or amount of time.
 
     Arguments:
@@ -103,23 +104,23 @@ def move_mails(mails_and_dates, archive, dry_run, logger):
     NOTE: When we move files, we must remove the trailing ',U=xxx' bit.
     Otherwise, we will be very sorry. See here for details.
         https://sourceforge.net/p/isync/mailman/message/35258847/
-    '''
+    """
     for email_path, date_stamp, subject in mails_and_dates:
         fixed_pathname = clean_pathname(email_path.name)
-        new_email_path = archive / date_stamp / 'cur' / fixed_pathname
+        new_email_path = archive / date_stamp / "cur" / fixed_pathname
         if dry_run:
-            logger.info(f'{subject} would be moved to {new_email_path}')
+            logger.info(f"{subject} would be moved to {new_email_path}")
         else:
             try:
                 email_path.rename(new_email_path)
-                logger.info(f'{email_path} was moved to {new_email_path}')
+                logger.info(f"{email_path} was moved to {new_email_path}")
             except PermissionError as perm_error:
                 logger.exception(perm_error)
                 raise perm_error
 
 
 def scan_mails(source, terminus, logger):
-    '''
+    """
     Scan source for emails older than terminus in source.
 
     Arguments:
@@ -128,73 +129,78 @@ def scan_mails(source, terminus, logger):
     logger -- logging object for documenting actions in this function
 
     TODO: Description of function in steps
-    '''
+    """
     emails = [(source / f) for f in source.iterdir() if (source / f).is_file()]
     dated_paths = {}
     mails_and_datestamps = []
 
     for email_path in emails:
-        msg = message_from_file(open(email_path, 'r', encoding='utf-8',
-                                     errors='ignore'))
-        date_str = msg.get('date')
-        subject = msg.get('subject')
+        msg = message_from_file(
+            open(email_path, "r", encoding="utf-8", errors="ignore")
+        )
+        date_str = msg.get("date")
+        subject = msg.get("subject")
         if date_str is None:
-            logger.warning(f'Ignoring {email_path}, which has no date')
+            logger.warning(f"Ignoring {email_path}, which has no date")
         else:
             email_date = parsedate_to_datetime(date_str)
             if email_date is None:
-                logger.warning(f'Ignoring {email_path}, which has no date')
-            elif email_date.strftime('%Y%m%d') < terminus.strftime('%Y%m%d'):
-                datestamp = email_date.strftime('%Y')
+                logger.warning(f"Ignoring {email_path}, which has no date")
+            elif email_date.strftime("%Y%m%d") < terminus.strftime("%Y%m%d"):
+                datestamp = email_date.strftime("%Y")
                 dated_paths[datestamp] = True
                 mails_and_datestamps.append((email_path, datestamp, subject))
             else:
-                logger.info(f'{email_path} is too recent to move')
+                logger.info(f"{email_path} is too recent to move")
 
     return dated_paths, mails_and_datestamps
 
 
 def prep_args(user_args):
-    '''Process arguments from docopt'''
+    """Process arguments from docopt"""
     prog_args = {}
 
-    MAILDIR = Path(environ['MAILDIR'])
-    prog_args['source'] = MAILDIR / 'recent/cur'
-    prog_args['target'] = MAILDIR / 'archive'
+    MAILDIR = Path(environ["MAILDIR"])
+    prog_args["source"] = MAILDIR / "recent/cur"
+    prog_args["target"] = MAILDIR / "archive"
 
-    if user_args['--quiet']:
-        logger = setup_logger('WARNING')
+    if user_args["--quiet"]:
+        logger = setup_logger("WARNING")
     else:
-        logger = setup_logger('INFO')
+        logger = setup_logger("INFO")
 
-    if user_args['--dry-run']:
+    if user_args["--dry-run"]:
         dry_run = True
     else:
         dry_run = False
 
-    terminus = user_args.get('--date')
+    terminus = user_args.get("--date")
     if terminus is None:
         terminus = datetime.now(timezone.utc).replace(day=1)
     else:
         try:
             terminus = datetime(terminus)
         except ValueError as e:
-            logger.warning(f'{terminus} is not a valid date!')
+            logger.warning(f"{terminus} is not a valid date!")
             raise e
-    prog_args['terminus'] = terminus
-    logger.info(f'Date is {terminus}')
+    prog_args["terminus"] = terminus
+    logger.info(f"Date is {terminus}")
 
     return prog_args, dry_run, logger
 
 
 def main():
-    arguments, dry_run, logger = prep_args(docopt(__doc__,))
-    dated_paths, mails_and_datestamps = scan_mails(arguments['source'],
-                                                   arguments['terminus'],
-                                                   logger)
-    make_paths(dated_paths, arguments['target'], dry_run, logger)
-    move_mails(mails_and_datestamps, arguments['target'], dry_run, logger)
+    arguments, dry_run, logger = prep_args(
+        docopt(
+            __doc__,
+        )
+    )
+    dated_paths, mails_and_datestamps = scan_mails(
+        arguments["source"], arguments["terminus"], logger
+    )
+    make_paths(dated_paths, arguments["target"], dry_run, logger)
+    move_mails(mails_and_datestamps, arguments["target"], dry_run, logger)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

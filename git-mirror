@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-'''git-mirror -- mirror arbitrary git repositories
+"""git-mirror -- mirror arbitrary git repositories
 
 Usage:
     git-mirror [-hq]
@@ -9,7 +9,7 @@ Options:
     --help, -h  Show this menu
     --quiet, -q  Limit log output to warnings or worse
 
-'''
+"""
 
 import subprocess
 import sys
@@ -22,60 +22,63 @@ from docopt import docopt
 import toml
 
 
-__version__ = '0.1'
+__version__ = "0.1"
 
 
 def setup_logger(level):
-    '''
+    """
     Create a log object to pass around the program.
 
     Arguments: level for logging
 
     1. Create logging instance and set its name, level, handler, and format.
     2. Return logging instance.
-    '''
-    logger = logging.getLogger('git-mirror')
+    """
+    logger = logging.getLogger("git-mirror")
     logger.setLevel(level)
     handler = logging.StreamHandler(stream=stdout)
     handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s '
-                                  '- %(message)s',
-                                  datefmt='%Y-%m-%d %I:%M:%S %p')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s " "- %(message)s",
+        datefmt="%Y-%m-%d %I:%M:%S %p",
+    )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
 
 
 def main():
-    args_dict = docopt(__doc__, help=True, version='0.0.1')
-    level = 'WARNING' if args_dict['--quiet'] else 'INFO'
+    args_dict = docopt(__doc__, help=True, version="0.0.1")
+    level = "WARNING" if args_dict["--quiet"] else "INFO"
     logger = setup_logger(level)
 
     try:
-        toml_file = Path.home() / '.git-mirror.toml'
+        toml_file = Path.home() / ".git-mirror.toml"
         cfg = toml.load(toml_file)
     except FileNotFoundError:
-        logger.warning(f'You need a {toml_file}! Create one!')
+        logger.warning(f"You need a {toml_file}! Create one!")
         sys.exit(1)
 
-    gh_url = cfg['github']['url']
-    bb_url = cfg['bitbucket']['url']
+    gh_url = cfg["github"]["url"]
+    bb_url = cfg["bitbucket"]["url"]
     # the urls are not Path objects: they *must* end in '/'
-    gh_url = gh_url if gh_url[-1] == '/' else gh_url+'/'
-    bb_url = bb_url if bb_url[-1] == '/' else bb_url+'/'
-    target_path = Path(cfg['mirror_path'])
+    gh_url = gh_url if gh_url[-1] == "/" else gh_url + "/"
+    bb_url = bb_url if bb_url[-1] == "/" else bb_url + "/"
+    target_path = Path(cfg["mirror_path"])
     if not target_path.is_dir():
         try:
             target_path.mkdir(exist_ok=True, parents=True)
-            logger.info(f'created {target_path}')
+            logger.info(f"created {target_path}")
         except FileExistsError as err:
             logger.criticall(err)
             sys.exit(1)
 
-    gh_repos = [(gh_url+repo, target_path/repo) for repo in
-                cfg['github']['repositories']]
-    bb_repos = [(bb_url+repo, target_path/repo) for repo in
-                cfg['bitbucket']['repositories']]
+    gh_repos = [
+        (gh_url + repo, target_path / repo) for repo in cfg["github"]["repositories"]
+    ]
+    bb_repos = [
+        (bb_url + repo, target_path / repo) for repo in cfg["bitbucket"]["repositories"]
+    ]
 
     for repo, target in gh_repos:
         mirror(repo, target, logger)
@@ -86,26 +89,42 @@ def main():
 def mirror(source, target, logger):
     if target.is_dir():
         try:
-            run(['git', '-C', target, 'remote', 'update', '--prune'],
-                stdout=subprocess.DEVNULL, check=True)
-            logger.info(f'git -C {target} remote update --prune')
+            run(
+                ["git", "-C", target, "remote", "update", "--prune"],
+                stdout=subprocess.DEVNULL,
+                check=True,
+            )
+            logger.info(f"git -C {target} remote update --prune")
         except CalledProcessError as err:
             logger.warning(err)
     else:
         try:
-            run(['git', 'clone', '--mirror', source, target],
-                stdout=subprocess.DEVNULL, check=True)
-            logger.info(f'git clone --mirror {source} {target}')
+            run(
+                ["git", "clone", "--mirror", source, target],
+                stdout=subprocess.DEVNULL,
+                check=True,
+            )
+            logger.info(f"git clone --mirror {source} {target}")
         except CalledProcessError as err:
             logger.warning(err)
 
     # set last modified date
     try:
-        date = run(['git', '-C', target, 'for-each-ref', '--sort=-authordate',
-                    '--count=1', '--format="%(authordate:iso8601)"'],
-                   stdout=subprocess.PIPE, check=True)
-        (target / 'info/web').mkdir(exist_ok=True, parents=True)
-        with open(target / 'info/web/last-modified', 'wb') as f:
+        date = run(
+            [
+                "git",
+                "-C",
+                target,
+                "for-each-ref",
+                "--sort=-authordate",
+                "--count=1",
+                '--format="%(authordate:iso8601)"',
+            ],
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+        (target / "info/web").mkdir(exist_ok=True, parents=True)
+        with open(target / "info/web/last-modified", "wb") as f:
             f.write(date.stdout)
     except CalledProcessError as err:
         logger.warning(err)
@@ -114,37 +133,49 @@ def mirror(source, target, logger):
 def clone(source, destination, logger):
     if is_work_tree(destination):
         try:
-            run(['git', '-C', destination, 'pull'],
-                stdout=subprocess.DEVNULL, check=True)
+            run(
+                ["git", "-C", destination, "pull"],
+                stdout=subprocess.DEVNULL,
+                check=True,
+            )
         except CalledProcessError as err:
             logger.warning(err)
     else:
         try:
-            run(['git', 'clone', source, destination],
-                stdout=subprocess.DEVNULL, check=True)
+            run(
+                ["git", "clone", source, destination],
+                stdout=subprocess.DEVNULL,
+                check=True,
+            )
         except CalledProcessError as err:
             logger.warning(err)
 
 
 def is_bare_repo(path):
     try:
-        is_bare = run(['git', '-C', path, 'rev-parse', '--is-bare-repository'],
-                      stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                      check=True).stdout.strip()
+        is_bare = run(
+            ["git", "-C", path, "rev-parse", "--is-bare-repository"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        ).stdout.strip()
     except CalledProcessError:
         pass
-    return True if is_bare == b'true' else False
+    return True if is_bare == b"true" else False
 
 
 def is_work_tree(path):
     try:
-        is_work = run(['git', '-C', path, 'rev-parse',
-                       '--is-inside-work-tree'], stdout=subprocess.PIPE,
-                      stderr=subprocess.DEVNULL, check=True).stdout.strip()
+        is_work = run(
+            ["git", "-C", path, "rev-parse", "--is-inside-work-tree"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        ).stdout.strip()
     except CalledProcessError:
         pass
-    return True if is_work == b'true' else False
+    return True if is_work == b"true" else False
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
