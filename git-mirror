@@ -56,7 +56,7 @@ def main():
         toml_file = Path.home() / ".git-mirror.toml"
         cfg = toml.load(toml_file)
     except FileNotFoundError:
-        logger.warning(f"You need a {toml_file}! Create one!")
+        logger.warning("You need a %s! Create one!", toml_file)
         sys.exit(1)
 
     gh_url = cfg["github"]["url"]
@@ -68,7 +68,7 @@ def main():
     if not target_path.is_dir():
         try:
             target_path.mkdir(exist_ok=True, parents=True)
-            logger.info(f"created {target_path}")
+            logger.info("created %s", target_path)
         except FileExistsError as err:
             logger.criticall(err)
             sys.exit(1)
@@ -161,7 +161,7 @@ def is_bare_repo(path):
         ).stdout.strip()
     except CalledProcessError:
         pass
-    return True if is_bare == b"true" else False
+    return bool(is_bare == b"true")
 
 
 def is_work_tree(path):
@@ -174,7 +174,7 @@ def is_work_tree(path):
         ).stdout.strip()
     except CalledProcessError:
         pass
-    return True if is_work == b"true" else False
+    return bool(is_work == b"true")
 
 
 if __name__ == "__main__":

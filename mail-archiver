@@ -135,23 +135,22 @@ def scan_mails(source, terminus, logger):
     mails_and_datestamps = []
 
     for email_path in emails:
-        msg = message_from_file(
-            open(email_path, "r", encoding="utf-8", errors="ignore")
-        )
-        date_str = msg.get("date")
-        subject = msg.get("subject")
+        with open(email_path, "r", encoding="utf-8", errors="ignore") as email:
+            msg = message_from_file(email)
+            date_str = msg.get("date")
+            subject = msg.get("subject")
         if date_str is None:
-            logger.warning(f"Ignoring {email_path}, which has no date")
+            logger.warning("Ignoring %s, which has no date", email_path)
         else:
             email_date = parsedate_to_datetime(date_str)
             if email_date is None:
-                logger.warning(f"Ignoring {email_path}, which has no date")
+                logger.warning("Ignoring %s, which has no date", email_path)
             elif email_date.strftime("%Y%m%d") < terminus.strftime("%Y%m%d"):
                 datestamp = email_date.strftime("%Y")
                 dated_paths[datestamp] = True
                 mails_and_datestamps.append((email_path, datestamp, subject))
             else:
-                logger.info(f"{email_path} is too recent to move")
+                logger.info("%s is too recent to move", email_path)
 
     return dated_paths, mails_and_datestamps
 
@@ -160,19 +159,16 @@ def prep_args(user_args):
     """Process arguments from docopt"""
     prog_args = {}
 
-    MAILDIR = Path(environ["MAILDIR"])
-    prog_args["source"] = MAILDIR / "recent/cur"
-    prog_args["target"] = MAILDIR / "archive"
+    maildir = Path(environ["MAILDIR"])
+    prog_args["source"] = maildir / "recent/cur"
+    prog_args["target"] = maildir / "archive"
 
     if user_args["--quiet"]:
         logger = setup_logger("WARNING")
     else:
         logger = setup_logger("INFO")
 
-    if user_args["--dry-run"]:
-        dry_run = True
-    else:
-        dry_run = False
+    dry_run = bool(user_args["--dry-run"])
 
     terminus = user_args.get("--date")
     if terminus is None:
@@ -181,10 +177,10 @@ def prep_args(user_args):
         try:
             terminus = datetime(terminus)
         except ValueError as e:
-            logger.warning(f"{terminus} is not a valid date!")
+            logger.warning("%s is not a valid date!", terminus)
             raise e
     prog_args["terminus"] = terminus
-    logger.info(f"Date is {terminus}")
+    logger.info("date is %s", terminus)
 
     return prog_args, dry_run, logger
 

@@ -89,14 +89,14 @@ def move_photos(photos_and_dates, dry_run, logger):
     """
     for old_path, new_path in photos_and_dates:
         if old_path == new_path:
-            logger.warning(f"wtf? old_path and new_path are the same!")
+            logger.warning("wtf? old_path and new_path are the same!")
             continue
         if dry_run:
-            logger.info(f"{old_path} would be moved to {new_path}")
+            logger.info("%s would be moved to %s", old_path, new_path)
         else:
             try:
                 old_path.rename(new_path)
-                logger.info(f"{old_path} was moved to {new_path}")
+                logger.info("%s was moved to %s", old_path, new_path)
             except PermissionError as perm_error:
                 logger.exception(perm_error)
                 raise perm_error
@@ -104,7 +104,7 @@ def move_photos(photos_and_dates, dry_run, logger):
 
 def is_photo(item):
     suffix = item.suffix
-    return (item.is_file()) and (suffix == ".jpg" or suffix == ".jpeg")
+    return (item.is_file()) and (suffix in (".jpg", ".jpeg"))
 
 
 def scan_photos(path, logger):
@@ -164,10 +164,7 @@ def process_args(user_args):
     else:
         photo_dir = Path(user_args["PHOTO_DIR"]).resolve()
 
-    if user_args["--dry-run"]:
-        dry_run = True
-    else:
-        dry_run = False
+    dry_run = bool(user_args["--dry-run"])
 
     return photo_dir, dry_run, logger
 
