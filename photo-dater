@@ -12,11 +12,12 @@ Options:
 
 """
 
+import logging
 from pathlib import Path
 from sys import stdout
-import logging
-from docopt import docopt
+
 import exifread
+from docopt import docopt
 
 
 def setup_logger(level):

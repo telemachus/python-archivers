@@ -12,15 +12,16 @@ Options:
 
 """
 
+import logging
+import re
 from datetime import datetime, timezone
 from email import message_from_file
 from email.utils import parsedate_to_datetime
 from os import environ
 from pathlib import Path
 from sys import stdout
-import logging
+
 from docopt import docopt
-import re
 
 
 def setup_logger(level):
